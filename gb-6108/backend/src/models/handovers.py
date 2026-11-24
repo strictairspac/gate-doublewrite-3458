@@ -18,7 +18,7 @@ from .base import metadata
 handover_pages = Table(
     "handover_pages",
     metadata,
-    Column("page", String(32), primary_key=True),
+    Column("page", String(32, collation="utf8mb4_bin"), primary_key=True),
     Column("generation", Integer, nullable=False),
     Column("checksum", String(64), nullable=False),
     Column("content", Text, nullable=False),
@@ -34,7 +34,7 @@ handovers = Table(
     metadata,
     Column("id", Integer, primary_key=True, autoincrement=True),
     Column("run_id", ForeignKey("runs.id"), nullable=True),
-    Column("page", String(32), nullable=False),
+    Column("page", String(32, collation="utf8mb4_bin"), nullable=False),
     Column("status", String(24), nullable=False),
     Column("handed_over", Boolean, nullable=False),
     # 实际交给下一班的代次（隔离沿用 / 旧代拦截时为历史代次；从未交班为 NULL）。
