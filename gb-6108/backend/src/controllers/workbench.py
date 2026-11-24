@@ -23,3 +23,15 @@ def new_run(case_id, data, user):
 def new_review(run_id, data, user):
     with engine.begin() as db:
         return reviews.sign(db, run_id, data, user["username"])
+
+
+def retry_run(run_id, user):
+    with engine.begin() as db:
+        run = runs.requeue(db, run_id, user["username"])
+    try:
+        cache.lpush("workbench:wake", str(run_id))
+        cache.ltrim("workbench:wake", 0, 99)
+    except RedisError:
+        # 数据库持久队列仍在，worker 会轮询到重新排队的批次。
+        pass
+    return run

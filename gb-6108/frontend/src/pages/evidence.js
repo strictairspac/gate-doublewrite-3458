@@ -1,7 +1,6 @@
 import { api } from "../api/workbench.js";
 import { errorText, field } from "../components/common/fields.js";
 import { empty, pageHeading, section } from "../components/common/panel.js";
-import { resultTable } from "../components/common/table.js";
 import { submit } from "../hooks/submit.js";
 import { el } from "../utils/dom.js";
 import { cell, download, time } from "../utils/format.js";
@@ -17,6 +16,81 @@ function reviewForm(id, saved) {
 function signature(review) {
   return el("div", {"data-testid": "reviewed", class: "signature"},
     el("strong", {}, `已签署 · ${review.actor}`), el("p", {}, review.note), el("time", {}, time(review.created_at)));
+}
+
+// 原始业务明细列保持原有顺序与位置；交班列追加在后面。
+const BASE_COLUMNS = [
+  "页号", "掉电阶段", "持久代", "目标代", "目标校验", "双写代", "双写校验",
+  "前缀写入字节", "结论", "说明", "读取文本",
+];
+const HANDOVER_COLUMNS = ["是否交班", "交班状态", "交班代次", "交班内容"];
+const COLUMNS = [...BASE_COLUMNS, ...HANDOVER_COLUMNS];
+
+function handoverStatusCell(row) {
+  const handed = Boolean(row.handed_over ?? row["是否交班"]);
+  const label = row["交班状态"] ?? row.handover_status_label ?? null;
+  const badge = el("span", {
+    class: `handover-badge ${handed ? "is-handed" : "is-missing"}`,
+    "data-testid": "handover-status",
+    "data-handed": handed ? "true" : "false",
+  }, handed ? "已交班" : "未交班");
+  const nuance = label && label !== (handed ? "已交班" : "未交班")
+    ? el("span", {class: "handover-substatus", "data-testid": "handover-detail-status"}, label)
+    : null;
+  return el("span", {class: "handover-status-cell"}, badge, nuance);
+}
+
+function generationCell(row) {
+  const generation = row.handover_generation ?? row["交班代次"] ?? row.generation ?? null;
+  return el("span", {
+    "data-testid": "handover-generation",
+    "data-generation": generation === null || generation === undefined ? "" : String(generation),
+  }, generation === null || generation === undefined ? "—" : `第${generation}代`);
+}
+
+function handoverCell(key, row) {
+  const handed = Boolean(row.handed_over ?? row["是否交班"]);
+  if (key === "是否交班") return handed; // 交给通用 cell() 渲染成 是/否
+  if (key === "交班状态") return handoverStatusCell(row);
+  if (key === "交班代次") return generationCell(row);
+  // 交班内容
+  const text = row["交班内容"] ?? row.handover_content ?? row.handover_text ?? null;
+  return text ? el("code", {"data-testid": "handover-content"}, text) : null;
+}
+
+function detailTable(rows) {
+  return el("div", {class: "table-scroll", tabindex: 0, role: "region", "aria-label": "业务结果明细"},
+    el("table", {"data-testid": "result-table"},
+      el("thead", {}, el("tr", {}, COLUMNS.map(key => el("th", {scope: "col"}, key)))),
+      el("tbody", {}, rows.map(row => {
+        const handed = Boolean(row.handed_over ?? row["是否交班"]);
+        const page = row["页号"] ?? row.page;
+        return el("tr", {
+          "data-testid": "handover-row",
+          "data-page": page,
+          "data-handed": handed ? "true" : "false",
+        }, COLUMNS.map(key => {
+          let value;
+          if (key === "页号") {
+            value = el("strong", {"data-testid": "handover-page", "data-page": page}, String(page));
+          } else if (HANDOVER_COLUMNS.includes(key)) {
+            value = handoverCell(key, row);
+          } else {
+            value = row[key];
+          }
+          return el("td", {}, value instanceof Node ? value : cell(value));
+        }));
+      }))));
+}
+
+function handoverOverview(result) {
+  const count = Array.isArray(result?.handovers) ? result.handovers.length : 0;
+  if (!result?.handover_summary && !count) return null;
+  return el("section", {class: "panel handover-overview", "data-testid": "handover-panel"},
+    el("h2", {}, "交班记录"),
+    el("p", {"data-testid": "handover-summary", class: "handover-hint"},
+      result.handover_summary || `本批共 ${count} 页。`,
+      " 每页是否已交班、交给下一班的代次见明细表；隔离页沿用上次交班内容，旧代不能覆盖已交班的新代，同代内容不同也会隔离。"));
 }
 
 export async function evidencePage(config, user, route) {
@@ -52,6 +126,7 @@ export async function evidencePage(config, user, route) {
       el("details", {}, el("summary", {}, "证据摘要"), el("code", {}, run.digest))),
     el("dl", {class: "metrics"}, Object.entries(run.result.metrics).map(([label, value]) =>
       el("div", {}, el("dt", {}, label), el("dd", {}, cell(value))))),
-    section("业务结果明细", run.result.rows.length ? resultTable(run.result.rows) : empty("此批次无明细。")),
+    handoverOverview(run.result),
+    section("业务结果明细", run.result.rows.length ? detailTable(run.result.rows) : empty("此批次无明细。")),
     section("复核签署", signing));
 }

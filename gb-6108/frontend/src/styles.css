@@ -115,3 +115,18 @@ td a[aria-current=true] { font-weight: 750; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* 交班记录与下一班可读日志页 */
+.handover-overview { display: grid; gap: .6rem; }
+.handover-hint { color: var(--muted); font-size: .92rem; margin: 0; }
+.handover-badge {
+  display: inline-block; padding: .16rem .55rem; font-size: .82rem; font-weight: 700;
+  border: 1px solid var(--rule); border-radius: 999px; white-space: nowrap;
+}
+.handover-badge.is-handed { color: var(--accent); background: var(--tint); border-color: var(--accent); }
+.handover-badge.is-missing { color: var(--signal); background: color-mix(in srgb, var(--signal) 9%, var(--surface)); border-color: var(--signal); }
+.handover-status-cell { display: inline-grid; gap: .2rem; }
+.handover-substatus { font-size: .78rem; color: var(--muted); }
+code[data-testid="handover-content"] { white-space: pre-wrap; overflow-wrap: anywhere; }
+.inline-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; margin-top: .4rem; }
+.retry-control { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
